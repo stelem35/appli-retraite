@@ -63,3 +63,11 @@ details>summary{cursor:pointer;font-weight:600;padding:4px 0}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(84px + env(safe-area-inset-bottom));background:#222;color:#fff;
   padding:10px 16px;border-radius:10px;z-index:10;max-width:90%}
 svg.chart{width:100%;height:auto;display:block}
+
+/* Correctifs mobile : champs date (iOS) qui débordent / se chevauchent */
+input,select,textarea{min-width:0;max-width:100%}
+input[type=date]{-webkit-appearance:none;appearance:none;display:block;height:44px;line-height:normal}
+input[type=date]::-webkit-date-and-time-value{text-align:left;min-height:1.2em}
+.grid2,.fig{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+.grid2>*,.fig>*{min-width:0}
+label{min-width:0}

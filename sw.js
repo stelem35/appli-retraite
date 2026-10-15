@@ -1,5 +1,5 @@
 /* Service worker : met toute l'application en cache pour un usage 100 % hors ligne. */
-const CACHE = 'retraite-v1';
+const CACHE = 'retraite-v2';
 const FILES = ['./', 'index.html', 'style.css', 'app.js', 'manifest.webmanifest',
   'icons/icon.svg', 'icons/icon-180.png', 'icons/icon-192.png', 'icons/icon-512.png'];
 
