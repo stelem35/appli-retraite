@@ -181,7 +181,7 @@ function accueil() {
 }
 
 const FIGS = [
-  ['qValid', 'Trimestres validés', 'number'], ['qReq', 'Trimestres requis', 'number'], ['legalAgeM', 'Âge légal (selon mon relevé)', 'age'],
+  ['qValid', 'Trimestres validés', 'number'], ['qReq', 'Trimestres requis', 'number'], ['legalAgeM', 'Âge de départ possible (selon mon relevé)', 'age'],
   ['pensionGross', 'Pension estimée brute (€/mois)', 'number'], ['pensionNet', 'Pension estimée nette (€/mois, si indiquée)', 'number'],
   ['simDate', 'Date de la simulation', 'date'], ['careerCheck', 'Dernière vérification du relevé de carrière', 'date']
 ];
