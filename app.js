@@ -38,13 +38,13 @@ function defaults() {
     refDate: '2030-01-01',
     startDate: t,
     fig: {
-      qValid: { v: '', d: '' }, qReq: { v: '', d: '' }, legalAge: { v: '', d: '' },
+      qValid: { v: '', d: '' }, qReq: { v: '', d: '' }, legalAge: { v: '', d: '' }, legalAgeM: { v: '', d: '' },
       pensionGross: { v: '', d: '' }, pensionNet: { v: '', d: '' },
       simDate: { v: '', d: '' }, careerCheck: { v: '', d: '' }
     },
     sc: {
       A: { date: '2030-01-01', income: '', pension: '', notes: '' },
-      B: { start45: '', date: '2030-01-01', salary100: '', pct: 90, advance: '', pension: '', impact: '', notes: '' }
+      B: { start45: '', date: '2030-01-01', income: '', salary100: '', pct: 90, advance: '', pension: '', impact: '', notes: '' }
     },
     cond,
     miles: [
@@ -63,8 +63,20 @@ function defaults() {
 }
 let S = load();
 function load() {
-  try { const r = localStorage.getItem(KEY); if (r) return Object.assign(defaults(), JSON.parse(r)); } catch (e) { }
+  try { const r = localStorage.getItem(KEY); if (r) return migrate(Object.assign(defaults(), JSON.parse(r))); } catch (e) { }
   return defaults();
+}
+/* Anciennes sauvegardes : ajoute les nouveaux champs. L'âge légal est désormais stocké en mois (legalAgeM). */
+function migrate(d) {
+  d.fig = Object.assign(defaults().fig, d.fig);
+  d.sc.B = Object.assign(defaults().sc.B, d.sc.B);
+  const old = d.fig.legalAge;
+  if (d.fig.legalAgeM.v === '' && old && old.v !== '') {
+    const t = String(old.v).trim();
+    const m = t.match(/^(\d{2})\s*ans?\s*(?:et\s*)?(\d{1,2})\s*(?:mois)?$/i) || t.match(/^(\d{2})(?:\s*ans?)?$/i);
+    if (m) d.fig.legalAgeM = { v: Number(m[1]) * 12 + Number(m[2] || 0), d: old.d };
+  }
+  return d;
 }
 function save() {
   try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { toast('Enregistrement impossible (stockage plein ou bloqué)'); }
@@ -169,16 +181,21 @@ function accueil() {
 }
 
 const FIGS = [
-  ['qValid', 'Trimestres validés', 'number'], ['qReq', 'Trimestres requis', 'number'], ['legalAge', 'Âge légal (selon mon relevé)', 'text'],
+  ['qValid', 'Trimestres validés', 'number'], ['qReq', 'Trimestres requis', 'number'], ['legalAgeM', 'Âge légal (selon mon relevé)', 'age'],
   ['pensionGross', 'Pension estimée brute (€/mois)', 'number'], ['pensionNet', 'Pension estimée nette (€/mois, si indiquée)', 'number'],
   ['simDate', 'Date de la simulation', 'date'], ['careerCheck', 'Dernière vérification du relevé de carrière', 'date']
 ];
+const ageText = m => `${Math.floor(m / 12)} ans${m % 12 ? ' ' + (m % 12) + ' mois' : ''}`;
 function chiffres() {
   const rows = FIGS.map(([k, label, type]) => {
     const f = S.fig[k], old = f.v !== '' && isOld(f.d), none = f.v !== '' && !f.d;
+    const valueField = type === 'age'
+      ? `<div><span class="lbl">Valeur</span><div class="age" data-age-box="${k}"><label>ans<input type="number" inputmode="numeric" min="0" max="120" data-age="y" value="${f.v === '' ? '' : Math.floor(f.v / 12)}"></label><label>mois<input type="number" inputmode="numeric" min="0" max="11" data-age="m" value="${f.v === '' ? '' : f.v % 12}"></label></div>
+         <div class="muted">${f.v === '' ? 'Ex. : 61 ans 7 mois' : ageText(f.v) + ' (' + f.v + ' mois)'}</div></div>`
+      : `<label>Valeur<input type="${type}" ${type === 'number' ? 'inputmode="decimal" step="any"' : ''} data-p="fig.${k}.v" data-stamp="fig.${k}.d" data-r value="${esc(f.v)}"></label>`;
     return `<div class="card"><div class="row sp"><b>${label}</b>${old ? '<span class="badge warn">⚠ plus d\'un an</span>' : none ? '<span class="badge">date manquante</span>' : ''}</div>
       <div class="fig">
-        <label>Valeur<input type="${type}" ${type === 'number' ? 'inputmode="decimal" step="any"' : ''} data-p="fig.${k}.v" data-stamp="fig.${k}.d" data-r value="${esc(f.v)}"></label>
+        ${valueField}
         <label>Mise à jour le<input type="date" data-p="fig.${k}.d" data-r value="${esc(f.d)}"></label>
       </div></div>`;
   }).join('');
@@ -188,32 +205,38 @@ function chiffres() {
 }
 
 function scenarios() {
-  const A = S.sc.A, B = S.sc.B, t = today();
-  const inc45 = num(B.salary100) != null && num(B.pct) != null ? num(B.salary100) * num(B.pct) / 100 : null;
-  const incomeB = inc45;
+  const A = S.sc.A, B = S.sc.B;
+  const pensionA = A.pension !== '' ? A.pension : S.fig.pensionNet.v;   // A reprend le net estimé des Chiffres tant qu'il n'est pas modifié
   const gap = (a, b) => (a == null || b == null) ? '—' : ((b - a >= 0 ? '+' : '') + money(b - a));
-  const pA = num(A.pension), pB = num(B.pension);
+  const iA = num(A.income), iB = num(B.income), pA = num(pensionA), pB = num(B.pension);
   const dd = A.date && B.date ? dayDiff(parse(A.date), parse(B.date)) : null;
+  const drop = (i, p) => { if (i == null || p == null) return '—'; const g = p - i; return (g >= 0 ? '+' : '') + money(g) + (i ? ' <small class="muted">(' + (g >= 0 ? '+' : '') + (g / i * 100).toFixed(0) + ' %)</small>' : ''); };
+  const dA = iA != null && pA != null ? pA - iA : null, dB = iB != null && pB != null ? pB - iB : null;
+  const help = t => `<div class="muted help">${t}</div>`;
+  const hint = B.salary100 !== '' && B.pct !== '' ? help('Indicatif d\'après vos saisies (salaire de référence × %) : ' + money(num(B.salary100) * num(B.pct) / 100) + '. Le revenu net ci-dessus reste votre saisie.') : '';
   return `<h2>Scénarios</h2><p class="disclaimer">${DISCLAIMER}</p>
   <section class="card"><h3>Comparaison</h3>
   <table class="cmp"><tr><th></th><th>A</th><th>B (4/5e)</th><th>Écart B−A</th></tr>
    <tr><td>Date de départ</td><td>${fmt(A.date)}</td><td>${fmt(B.date)}</td><td>${dd == null ? '—' : dd + ' j'}</td></tr>
-   <tr><td>Revenu mensuel pendant la période</td><td>${money(A.income)}</td><td>${money(incomeB)}${num(B.advance) ? ' <br><small class="muted">+ avance ' + money(B.advance) + '</small>' : ''}</td><td>${gap(num(A.income), incomeB)}</td></tr>
-   <tr><td>Pension estimée (€/mois)</td><td>${money(A.pension)}</td><td>${money(B.pension)}</td><td>${gap(pA, pB)}</td></tr>
+   <tr><td>Revenu net mensuel avant le départ</td><td>${money(A.income)}</td><td>${money(B.income)}</td><td>${gap(iA, iB)}</td></tr>
+   <tr><td>Pension nette mensuelle après le départ</td><td>${money(pensionA)}</td><td>${money(B.pension)}</td><td>${gap(pA, pB)}</td></tr>
+   <tr><td>Écart pension − revenu avant départ</td><td>${drop(iA, pA)}</td><td>${drop(iB, pB)}</td><td>${dA != null && dB != null ? gap(dA, dB) : '—'}</td></tr>
   </table>
-  <p class="muted">Le revenu du scénario B = salaire de référence × pourcentage visé, calculé uniquement à partir de vos saisies.</p></section>
+  <p class="muted">Calculs faits uniquement à partir de vos saisies (revenus et pensions nets).</p></section>
 
   <section class="card"><h3>Scénario A — départ à la date indiquée</h3>
     ${input('Date de départ', 'sc.A.date', 'date', 'data-r')}
-    ${input('Revenu mensuel pendant la période (€)', 'sc.A.income', 'number', 'inputmode="decimal" data-r')}
-    ${input('Pension estimée (€/mois)', 'sc.A.pension', 'number', 'inputmode="decimal" data-r')}
+    ${input('Revenu net mensuel avant le départ (€)', 'sc.A.income', 'number', 'inputmode="decimal" data-r')}${help('Salaire net actuel (A) ou net en 4/5e avec complément (B).')}
+    <label>Pension nette mensuelle estimée après le départ (€)<input type="number" inputmode="decimal" data-p="sc.A.pension" data-r value="${esc(pensionA)}"></label>${help('D\'après Mon compte retraite.' + (A.pension === '' && S.fig.pensionNet.v !== '' ? ' Préremplie avec le net estimé de l\'onglet Chiffres ; modifiable.' : ''))}
     ${area('Hypothèses / notes', 'sc.A.notes')}</section>
 
   <section class="card"><h3>Scénario B — passage à 4/5e puis départ</h3>
     <div class="grid2 stack">${input('Début du 4/5e', 'sc.B.start45', 'date')}${input('Date de départ', 'sc.B.date', 'date', 'data-r')}</div>
-    <div class="grid2 stack">${input('Salaire mensuel de référence à 100 % (€)', 'sc.B.salary100', 'number', 'inputmode="decimal" data-r')}${input('Salaire visé (% du salaire)', 'sc.B.pct', 'number', 'inputmode="decimal" data-r')}</div>
+    ${input('Revenu net mensuel avant le départ (€)', 'sc.B.income', 'number', 'inputmode="decimal" data-r')}${help('Salaire net actuel (A) ou net en 4/5e avec complément (B).')}
+    <div class="grid2 stack">${input('Salaire mensuel de référence à 100 % (€, facultatif)', 'sc.B.salary100', 'number', 'inputmode="decimal" data-r')}${input('Salaire visé (% du salaire)', 'sc.B.pct', 'number', 'inputmode="decimal" data-r')}</div>
     ${input('Avance sur retraite (€/mois)', 'sc.B.advance', 'number', 'inputmode="decimal" data-r')}
-    ${input('Pension estimée (€/mois)', 'sc.B.pension', 'number', 'inputmode="decimal" data-r')}
+    ${hint}
+    ${input('Pension nette mensuelle estimée après le départ (€)', 'sc.B.pension', 'number', 'inputmode="decimal" data-r')}${help('D\'après Mon compte retraite.')}
     ${area('Impact éventuel sur la pension finale', 'sc.B.impact')}
     ${area('Hypothèses / notes', 'sc.B.notes')}
     <p class="muted">Conditions encore à confirmer d'ici fin 2026 : voir l'onglet « Conditions ».</p></section>`;
@@ -286,6 +309,13 @@ function rerender() { const y = window.scrollY; const a = document.activeElement
 document.addEventListener('change', e => {
   const el = e.target;
   if (el.id === 'imp') return importFile(el.files[0]);
+  if (el.dataset && el.dataset.age) {
+    const box = el.closest('[data-age-box]'), k = box.dataset.ageBox;
+    const y = box.querySelector('[data-age=y]').value, m = box.querySelector('[data-age=m]').value;
+    if (y === '' && m === '') S.fig[k].v = '';
+    else { S.fig[k].v = Math.max(0, Math.floor(Number(y || 0)) * 12 + Math.floor(Number(m || 0))); S.fig[k].d = iso(today()); }
+    save(); return rerender();
+  }
   const p = el.dataset && el.dataset.p; if (!p) return;
   let v = el.type === 'checkbox' ? el.checked : el.value;
   if (el.hasAttribute('data-bool')) v = v === '1';

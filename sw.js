@@ -1,5 +1,5 @@
-/* Service worker : met toute l'application en cache pour un usage 100 % hors ligne. */
-const CACHE = 'retraite-v2';
+﻿/* Service worker : met toute l'application en cache pour un usage 100 % hors ligne. */
+const CACHE = 'retraite-v3';
 const FILES = ['./', 'index.html', 'style.css', 'app.js', 'manifest.webmanifest',
   'icons/icon.svg', 'icons/icon-180.png', 'icons/icon-192.png', 'icons/icon-512.png'];
 
@@ -9,7 +9,7 @@ self.addEventListener('install', e => {
 self.addEventListener('activate', e => {
   e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim()));
 });
-/* Cache d'abord, mise à jour en arrière-plan quand le réseau est disponible. */
+/* Cache d'abord, mise Ã  jour en arriÃ¨re-plan quand le rÃ©seau est disponible. */
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET' || new URL(e.request.url).origin !== location.origin) return;
   e.respondWith(caches.match(e.request, { ignoreSearch: true }).then(hit => {

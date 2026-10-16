@@ -71,3 +71,7 @@ input[type=date]::-webkit-date-and-time-value{text-align:left;min-height:1.2em}
 .grid2,.fig{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
 .grid2>*,.fig>*{min-width:0}
 label{min-width:0}
+.age{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px}
+.age label{margin:0}
+.lbl{display:block;font-size:.85rem;color:var(--muted);margin:10px 0 3px}
+.help{margin:3px 0 0}
